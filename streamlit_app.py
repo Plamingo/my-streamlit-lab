@@ -93,7 +93,7 @@ SPREADSHEET_ID  = '1QRdgLOJP6sR1bqdg4qDORy_il3UHyIb0NE93UlK9-Ow'
 from google.oauth2.service_account import Credentials
 
 class SheetManager:
-  def __init__(self, spreadsheet_id, credentials_file="auth/credentials.json"):
+  def __init__(self, spreadsheet_id, credentials_file=json.loads(st.secrets["creds"])): #"auth/credentials.json"
     self.spreadsheet_id = spreadsheet_id
     self.creds_file = credentials_file
     self.service = None
