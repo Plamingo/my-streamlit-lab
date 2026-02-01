@@ -165,8 +165,6 @@ if user_check != "1134":
   st.error("사용자 비밀번호를 입력해주세요.")
   st.stop()
 
-
-
 if 'sheet_manager' not in st.session_state:
   st.session_state.sheet_manager = SheetManager(SPREADSHEET_ID)
 
