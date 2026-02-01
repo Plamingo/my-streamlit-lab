@@ -108,7 +108,7 @@ class SheetManager:
 
     # self.creds = Credentials.from_service_account_file(self.creds_file, scopes=SCOPES)
     self.creds = service_account.Credentials.from_service_account_info(creds_info, scopes=SCOPES)
-    self.service = build("sheets","V4",credentials=self.creds)
+    self.service = build("sheets","V4",credentials=self.creds,static_discovery=False)
 
   def read(self, sheet_name="시트1", range_str="B2:F300"):
     try:
