@@ -159,7 +159,6 @@ class SheetManager:
 if "user_id" not in st.session_state:
   st.session_state.user_id = None
 
-
 user_check = st.text_input("비밀번호 입력", type='password')
 
 if user_check != "1134":
