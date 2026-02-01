@@ -22,6 +22,7 @@ import json
 # case 2 : google-api-python-client 사용
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
+from google.oauth2 import service_account
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
@@ -94,15 +95,19 @@ SPREADSHEET_ID  = '1QRdgLOJP6sR1bqdg4qDORy_il3UHyIb0NE93UlK9-Ow'
 from google.oauth2.service_account import Credentials
 
 class SheetManager:
-  def __init__(self, spreadsheet_id, credentials_file=(st.secrets["creds"])): #"auth/credentials.json"
+  def __init__(self, spreadsheet_id): #"auth/credentials.json" credentials_file=(st.secrets["creds"])
     self.spreadsheet_id = spreadsheet_id
-    self.creds_file = credentials_file
+    # self.creds_file = credentials_file
     self.service = None
     self._connect()
 
   def _connect(self):
     SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
-    self.creds = Credentials.from_service_account_file(self.creds_file, scopes=SCOPES)
+
+    creds_info = json.loads(st.secrets["creds"])
+
+    # self.creds = Credentials.from_service_account_file(self.creds_file, scopes=SCOPES)
+    self.creds = service_account.Credentials.from_service_account_info(creds_info, scopes=SCOPES)
     self.service = build("sheets","V4",credentials=self.creds)
 
   def read(self, sheet_name="시트1", range_str="B2:F300"):
