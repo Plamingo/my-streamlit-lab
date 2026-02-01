@@ -1,0 +1,6 @@
+auth/
+*.bat
+start app.bat
+
+# Streamlit
+.streamlit/secrets.toml
