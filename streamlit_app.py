@@ -1,6 +1,5 @@
 import pandas as pd 
 import streamlit as st
-import icecream as ic
 import os
 from datetime import datetime, timedelta
 import plotly.express as px
