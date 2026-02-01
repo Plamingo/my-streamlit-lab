@@ -155,7 +155,19 @@ class SheetManager:
     except HttpError as e:
       st.error(f"추가 오류 : {e}")
       return None
-    
+
+if "user_id" not in st.session_state:
+  st.session_state.user_id = None
+
+
+user_check = st.text_input("비밀번호 입력", type='password')
+
+if user_check != "1134":
+  st.error("사용자 비밀번호를 입력해주세요.")
+  st.stop()
+
+
+
 if 'sheet_manager' not in st.session_state:
   st.session_state.sheet_manager = SheetManager(SPREADSHEET_ID)
 
