@@ -26,6 +26,7 @@ from google.oauth2 import service_account
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from google.oauth2.service_account import Credentials
 
 page_css = '''
 <style>
@@ -92,7 +93,44 @@ SPREADSHEET_ID  = '1QRdgLOJP6sR1bqdg4qDORy_il3UHyIb0NE93UlK9-Ow'
 
 #   return creds
 
-from google.oauth2.service_account import Credentials
+css = """
+<style>
+.main {
+  background-color: #f8fafc;
+}
+.stButton>button {
+  width: 100%;
+  border-radius: 10px;
+  background-color: #2563eb;
+  color: white;
+}
+.card {
+  background-color: white;
+  padding: 20px;
+  border-radius: 15px;
+  border: 1px solid #f1f5f9;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  margin-bottom: 20px;
+}
+.metric-title {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  margin-bottom: 5px;
+}
+.metric-value {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #1e293b;
+}
+.sidebar-title {
+  font-size: 1.3rem;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+</style>
+"""
+st.html(css)
+
 
 class SheetManager:
   def __init__(self, spreadsheet_id): #"auth/credentials.json" credentials_file=(st.secrets["creds"])
@@ -124,10 +162,6 @@ class SheetManager:
         return pd.DataFrame()
       
       df = pd.DataFrame(rows[1:],columns=rows[0])
-      
-      df = df.dropna(subset=['Date'])
-      currency_cols = ['상환금액','원금','이자']
-      df[currency_cols] = df[currency_cols].replace('',0).astype(int)
       return df
     
     except HttpError as e:
@@ -159,64 +193,132 @@ class SheetManager:
 if "user_id" not in st.session_state:
   st.session_state.user_id = None
 
-user_check = st.text_input("비밀번호 입력", type='password')
+# --- 사이드바 (로그인 및 네비게이션) ---
+with st.sidebar:
+  st.html('<p class="sidebar-title">🏦 대출 관리자</p>')
+  if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
 
-if user_check != "1134":
-  st.error("사용자 비밀번호를 입력해주세요.")
-  st.stop()
+  if not st.session_state.logged_in:
+    st.subheader("로그인")
+    password = st.text_input("비밀번호를 입력하세요", type="password")
+    if st.button("로그인"):
+      if password == "1134":
+        st.session_state.logged_in = True
+        st.rerun()
+      else:
+        st.error("비밀번호가 틀렸습니다.")
 
-if 'sheet_manager' not in st.session_state:
-  st.session_state.sheet_manager = SheetManager(SPREADSHEET_ID)
+  else:
+    st.success("인증 완료")
+    
+    # selected_name = st.radio("목록", list(LOAN_DATA.keys()), label_visibility="collapsed")
+    
+    if st.button("로그아웃"):
+      st.session_state.logged_in = False
+      st.rerun()
 
-manager = st.session_state.sheet_manager
-cols = st.columns((2,2))
+# --- 메인 화면 콘텐츠 ---
+if st.session_state.get('logged_in'):
 
-# 데이터 읽기
-df = manager.read(sheet_name="시트1" ,range_str="B2:F300")
-full_list = df['대출명'].unique().tolist()
-except_list = df.loc[df['원금'] ==0, "대출명"].unique().tolist()
-loan_list = [item for item in full_list if item not in except_list]
-# 상환이 완료된 대출 제외
-df = df.loc[df["대출명"].isin(loan_list)]
+  if 'sheet_manager' not in st.session_state:
+    st.session_state.sheet_manager = SheetManager(SPREADSHEET_ID)
 
-with cols[0]:
-  df_styled = df.style.format({
-    '상환금액': '{:,.0f}원',
-    '이자': '{:,.0f}원', 
-    '원금': '{:,.0f}원'
-    })
-  with st.expander("상세보기", expanded=True):
-    st.dataframe(df_styled,hide_index=True)
+  manager = st.session_state.sheet_manager
+  df = manager.read(sheet_name="시트1" ,range_str="B2:F300")
+  df = df.dropna(subset=['Date'])
+  df['month'] = pd.to_datetime(df['Date']).dt.month
+  currency_cols = ['상환금액','원금','이자']
+  df[currency_cols] = df[currency_cols].replace('','0').astype(int)
 
-with cols[0]:
-  # 데이터 추가 
-  sub_cols = st.columns(3)
-  loan_name = sub_cols[0].selectbox(label="선택",label_visibility='collapsed',options=loan_list)
-  df = df.loc[df['대출명'] == loan_name]
-  date_input = sub_cols[1].date_input(label="입금날짜", label_visibility='collapsed', value='today')  
-  sub_cols = st.columns(3)
-  principal = sub_cols[0].number_input(label="잔여 원금", value=df['원금'].min(), disabled=True)
-  repayment = sub_cols[1].number_input(label='상환금액',value=0)
-  interest = sub_cols[2].number_input(label='이자',value=0)
   
-  new_row = {"Date":date_input, "대출명":loan_name, "상환금액":repayment, "이자":interest, "원금":principal-repayment}
-  new_row["Date"] = new_row["Date"].strftime("%Y-%m-%d")
-  new_row_list = list(new_row.values())
+  data = manager.read(sheet_name="시트1" ,range_str="I2:L300")
+  full_list = df['대출명'].unique().tolist()
+  except_list = df.loc[df['원금'] ==0, "대출명"].unique().tolist()
+  loan_list = [item for item in full_list if item not in except_list]
 
-  if st.button("업데이트"):
-    st.write(new_row_list)
-    manager.append(new_row_list)
+  df = df.loc[df["대출명"].isin(loan_list)]
+  
 
-with cols[1].container(border=True):
-  today = datetime.now()
-  prev_date = today - timedelta(days=60)
-  next_date = today + timedelta(days=60)
-  fig = px.line(df, 
-            x='Date', 
-            y=['원금'], 
-            color='대출명', 
-            markers=True,
-            title="대출별 상환금액 추이")
-  fig.update_traces(connectgaps=True, line_shape="hv")
-  fig.update_layout(xaxis=dict(range=[prev_date, next_date]),yaxis=dict(range=[0, df['원금'].max()*1.2]))
-  st.plotly_chart(fig)
+  with st.sidebar:
+    st.markdown("---")
+    st.caption("대출 목록 선택")
+    loan_name = st.radio("목록", loan_list, label_visibility="collapsed")
+
+  data = data.loc[data["대출명"] == loan_name].iloc[0]
+  df = df.loc[df["대출명"] == loan_name]
+
+  cols = st.columns((2,2))
+
+  with cols[0]:
+    st.title(f"{loan_name} 현황")
+    st.write("대출 만기일까지의 상환 추이 및 내역을 확인하세요.")
+
+  with cols[1]:
+    st.html(f"""
+      <div style="display: flex; gap: 10px; margin-top: 20px;">
+        <div class="card" style="flex: 1; padding: 10px; text-align: center;">
+          <div class="metric-title">이자율</div>
+          <div class="metric-value" style="color: #2563eb;">{data['이자율']*100:.2f}%</div>
+        </div>
+        <div class="card" style="flex: 1; padding: 10px; text-align: center;">
+          <div class="metric-title">기간</div>
+          <div class="metric-value">{data['대출기간']}</div>
+        </div>
+      </div>
+    """)
+
+  with cols[1].container(border=True):
+    st.html('<b>📉 상환 잔액 변동 추이</b>')
+    # fig_line = px.area(df, x='Date', y='원금', color_discrete_sequence=['#3b82f6'])
+    # fig_line.update_layout(
+    #     margin=dict(l=0, r=0, t=20, b=0),
+    #     height=300,
+    #     xaxis_title=None,
+    #     yaxis_title=None,
+    #     paper_bgcolor='rgba(0,0,0,0)',
+    #     plot_bgcolor='rgba(0,0,0,0)'
+    # )
+    # st.plotly_chart(fig_line, width='stretch')
+    # st.html('</div>')
+    today = datetime.now()
+    prev_date = today - timedelta(days=60)
+    next_date = today + timedelta(days=60)
+    fig = px.line(df, 
+              x='Date', 
+              y=['원금'], 
+              color='대출명', 
+              markers=True,)
+              # title="대출별 상환금액 추이")
+    fig.update_traces(connectgaps=True, line_shape="hv")
+    fig.update_layout(xaxis=dict(range=[prev_date, next_date]),yaxis=dict(range=[0, df['원금'].max()*1.2]))
+    st.plotly_chart(fig)
+
+
+  with cols[0]:
+    df_styled = df.style.format({
+      '상환금액': '{:,.0f}원',
+      '이자': '{:,.0f}원', 
+      '원금': '{:,.0f}원'
+      })
+    with st.expander("상세보기", expanded=True):
+      st.dataframe(df_styled,hide_index=True)
+
+  
+  with cols[0]:
+    # 데이터 추가 
+    sub_cols = st.columns(3)
+    date_input = sub_cols[0].date_input(label="입금날짜", value='today')  
+    principal = sub_cols[1].number_input(label="잔여원금", value=df['원금'].min(), disabled=True)
+    
+    sub_cols = st.columns(3)
+    repayment = sub_cols[0].number_input(label='상환금액',value=0)
+    interest = sub_cols[1].number_input(label='이자',value=0)
+    
+    new_row = {"Date":date_input, "대출명":loan_name, "상환금액":repayment, "이자":interest, "원금":principal-repayment}
+    new_row["Date"] = new_row["Date"].strftime("%Y-%m-%d")
+    new_row_list = list(new_row.values())
+
+    if st.button("업데이트"):
+      st.write(new_row_list)
+      manager.append(new_row_list)
